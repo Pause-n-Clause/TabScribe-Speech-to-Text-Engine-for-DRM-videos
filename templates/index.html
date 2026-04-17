@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="en" data-bg="black" data-accent="green">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tabscribe</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+  /* ── Base (black bg) ── */
+  :root {
+    --bg:      #0d0d0d;
+    --surface: #141414;
+    --border:  #2a2a2a;
+    --text:    #e8e8e8;
+    --muted:   #555;
+    --warn:    #f0a500;
+    --mono:    'IBM Plex Mono', monospace;
+    --sans:    'IBM Plex Sans', sans-serif;
+    --accent:  #00ff88;
+    --accent2: #00c8ff;
+    --seg-new-bg: rgba(0,255,136,0.04);
+  }
+
+  /* ── White bg override ── */
+  [data-bg="white"] {
+    --bg:      #f5f5f5;
+    --surface: #ebebeb;
+    --border:  #d0d0d0;
+    --text:    #111111;
+    --muted:   #888888;
+    --seg-new-bg: rgba(0,0,0,0.04);
+  }
+
+  /* ── Accent overrides ── */
+  [data-accent="green"] { --accent:#00ff88; --accent2:#00c8ff; }
+  [data-accent="red"]   { --accent:#ff4455; --accent2:#ff9944; }
+  [data-accent="blue"]  { --accent:#00aaff; --accent2:#a78bfa; }
+  [data-accent="purple"]{ --accent:#bb55ff; --accent2:#ff55cc; }
+
+  *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transition: background 0.2s, color 0.2s;
+  }
+
+  /* ── HEADER ── */
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--bg);
+    flex-shrink: 0;
+    z-index: 100;
+    transition: background 0.2s, border-color 0.2s;
+  }
+
+  .icon-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 5px 9px;
+    font-size: 13px;
+    border-radius: 2px;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: var(--mono);
+    letter-spacing: 0;
+    text-transform: none;
+    font-weight: 400;
+  }
+  .icon-btn:hover { border-color:var(--accent); color:var(--accent); }
+
+  .logo {
+    font-family: var(--mono);
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    color: var(--accent);
+    text-transform: uppercase;
+  }
+  .logo span { color: var(--muted); }
+
+  .status-badge {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 3px 9px;
+    border-radius: 2px;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    transition: all 0.25s;
+    min-width: 80px;
+    text-align: center;
+  }
+  .status-badge.ready   { border-color:var(--accent); color:var(--accent); }
+  .status-badge.running { border-color:var(--accent); color:var(--accent); animation:pulse 1.4s ease-in-out infinite; }
+  .status-badge.paused  { border-color:var(--warn);   color:var(--warn); }
+  .status-badge.stopped { border-color:var(--muted);  color:var(--muted); }
+  @keyframes pulse { 0%,100%{opacity:1;}50%{opacity:0.35;} }
+
+  .header-right { margin-left:auto; display:flex; align-items:center; gap:10px; }
+
+  /* ── THEME POPUP ── */
+  .theme-wrap { position:relative; }
+
+  .theme-trigger {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 5px 12px;
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    border-radius: 2px;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .theme-trigger:hover { border-color:var(--accent); color:var(--accent); }
+  .theme-trigger .dot {
+    width: 9px; height: 9px;
+    border-radius: 50%;
+    background: var(--accent);
+    flex-shrink: 0;
+  }
+
+  .theme-popup {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 16px 18px;
+    width: 220px;
+    z-index: 300;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+    display: none;
+  }
+  .theme-popup.open { display:block; }
+
+  .popup-section { margin-bottom:14px; }
+  .popup-section:last-child { margin-bottom:0; }
+  .popup-label {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 9px;
+  }
+
+  /* Background toggle (Black / White) */
+  .bg-row { display:flex; gap:8px; }
+  .bg-btn {
+    flex: 1;
+    padding: 7px 0;
+    font-family: var(--mono);
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    border-radius: 2px;
+    cursor: pointer;
+    background: transparent;
+    transition: all 0.15s;
+    text-align: center;
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+  .bg-btn:hover { border-color:var(--text); color:var(--text); }
+  .bg-btn.active { border-color:var(--text); color:var(--text); background: rgba(128,128,128,0.12); }
+
+  /* Accent swatches (Green / Red / Blue / Purple) */
+  .swatch-row { display:flex; gap:8px; }
+  .swatch {
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: transform 0.12s, border-color 0.12s;
+    flex-shrink: 0;
+  }
+  .swatch:hover { transform:scale(1.18); }
+  .swatch.active { border-color: var(--text); }
+  .swatch[data-a="green"]  { background:#00ff88; }
+  .swatch[data-a="red"]    { background:#ff4455; }
+  .swatch[data-a="blue"]   { background:#00aaff; }
+  .swatch[data-a="purple"] { background:#bb55ff; }
+
+  /* ── WARNING BANNER ── */
+  .warning-banner {
+    background: rgba(240,165,0,0.05);
+    border-bottom: 1px solid rgba(240,165,0,0.15);
+    padding: 5px 20px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: rgba(240,165,0,0.7);
+    flex-shrink: 0;
+  }
+  .warning-banner strong { color:var(--warn); }
+
+  /* ── CONTROLS ── */
+  .controls {
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    background: var(--bg);
+    transition: background 0.2s, border-color 0.2s;
+  }
+
+  button {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 8px 18px;
+    border: 1px solid;
+    border-radius: 2px;
+    cursor: pointer;
+    transition: all 0.15s;
+    background: transparent;
+  }
+  button:disabled { opacity:0.22; cursor:not-allowed; }
+
+  /* Play/Pause — left, primary */
+  #btn-playpause {
+    border-color: var(--accent);
+    color: var(--accent);
+    min-width: 130px;
+  }
+  #btn-playpause:hover:not(:disabled) { background:var(--accent); color:#000; }
+
+  /* Clear — next to play/pause */
+  #btn-clear {
+    border-color: var(--border);
+    color: var(--muted);
+    padding: 8px 14px;
+    font-size: 10px;
+  }
+  #btn-clear:hover:not(:disabled) { border-color:#ff4455; color:#ff4455; }
+
+  .ctrl-spacer { flex:1; }
+
+  /* Export buttons — right */
+  .btn-export {
+    border-color: var(--border);
+    color: var(--muted);
+    font-size: 10px;
+    padding: 7px 14px;
+  }
+  .btn-export:hover:not(:disabled) { border-color:var(--accent2); color:var(--accent2); }
+  .btn-export.highlight {
+    border-color: var(--accent) !important;
+    color: var(--accent) !important;
+    animation: glow 0.7s ease-in-out 4;
+  }
+  @keyframes glow {
+    0%,100%{ box-shadow:0 0 4px rgba(0,0,0,0.1); }
+    50%    { box-shadow:0 0 14px color-mix(in srgb, var(--accent) 60%, transparent); }
+  }
+
+  /* ── STATS ── */
+  .stats {
+    padding: 7px 20px;
+    display: flex;
+    gap: 22px;
+    border-bottom: 1px solid var(--border);
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    flex-shrink: 0;
+    background: var(--bg);
+    transition: background 0.2s, border-color 0.2s;
+  }
+  .stats span { color:var(--text); margin-left:4px; }
+
+  /* ── SHELL ── */
+  .shell {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+    background: var(--bg);
+    transition: background 0.2s;
+  }
+
+  /* ── SIDEBAR ── */
+  .sidebar {
+    width: 270px;
+    min-width: 270px;
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    background: var(--surface);
+    transition: width 0.22s, min-width 0.22s, background 0.2s, border-color 0.2s;
+    overflow: hidden;
+  }
+  .sidebar.collapsed { width:0; min-width:0; border-right:none; }
+
+  .sidebar-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .sidebar-tab {
+    flex: 1;
+    padding: 10px 8px;
+    font-family: var(--mono);
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    text-align: center;
+    cursor: pointer;
+    color: var(--muted);
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+    background: transparent;
+    border-top:none; border-left:none; border-right:none;
+    border-radius: 0;
+  }
+  .sidebar-tab:hover { color:var(--text); }
+  .sidebar-tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+
+  .sidebar-panel { display:none; flex:1; overflow-y:auto; padding:14px; }
+  .sidebar-panel.active { display:block; }
+
+  .history-empty {
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 10px;
+    text-align: center;
+    padding: 28px 8px;
+    line-height: 2.2;
+  }
+
+  .hist-entry {
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 11px 13px;
+    margin-bottom: 9px;
+    transition: border-color 0.15s;
+  }
+  .hist-entry:hover { border-color:var(--accent); }
+  .hist-top { display:flex; align-items:center; gap:7px; margin-bottom:5px; }
+  .hist-badge {
+    font-family: var(--mono);
+    font-size: 9px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 2px;
+    letter-spacing: 0.06em;
+  }
+  .hist-badge.txt { color:var(--accent2); border:1px solid var(--accent2); }
+  .hist-badge.srt { color:var(--accent);  border:1px solid var(--accent); }
+  .hist-name { font-family:var(--mono); font-size:10px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1; }
+  .hist-meta { font-family:var(--mono); font-size:10px; color:var(--muted); }
+  .hist-meta span { color:var(--text); }
+  .hist-time { font-family:var(--mono); font-size:10px; color:var(--muted); margin-top:3px; }
+
+  .about-section { margin-bottom:18px; }
+  .about-section h3 { font-family:var(--mono); font-size:9px; font-weight:600; letter-spacing:0.1em; text-transform:uppercase; color:var(--accent); margin-bottom:7px; }
+  .about-section p { font-size:12px; color:var(--muted); line-height:1.7; }
+  .about-chip { display:inline-block; font-family:var(--mono); font-size:9px; padding:2px 7px; border:1px solid var(--border); border-radius:2px; color:var(--muted); margin:3px 3px 0 0; }
+
+  /* ── TRANSCRIPT ── */
+  #transcript {
+    flex: 1;
+    overflow-y: auto;
+    padding: 18px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .empty-state {
+    margin: auto;
+    text-align: center;
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 2.4;
+  }
+  .empty-state .big { font-size:30px; display:block; margin-bottom:10px; opacity:0.2; }
+
+  .seg {
+    display: grid;
+    grid-template-columns: 96px 1fr;
+    gap: 14px;
+    padding: 8px 11px;
+    border-radius: 3px;
+    border-left: 2px solid transparent;
+    transition: background 0.15s, border-color 0.15s;
+    animation: slideIn 0.2s ease-out;
+  }
+  .seg:hover { background:var(--surface); border-left-color:var(--accent); }
+  @keyframes slideIn { from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:none;} }
+  .seg-time { font-family:var(--mono); font-size:10px; color:var(--muted); padding-top:2px; white-space:nowrap; }
+  .seg-text { font-size:13px; font-weight:300; line-height:1.65; }
+  .seg.new  { border-left-color:var(--accent); background:var(--seg-new-bg); }
+
+  #transcript::-webkit-scrollbar { width:3px; }
+  #transcript::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
+
+  /* ── CLEAR MODAL ── */
+  #modal-overlay {
+    position:fixed; inset:0;
+    background:rgba(0,0,0,0.75);
+    display:flex; align-items:center; justify-content:center;
+    z-index:500;
+    backdrop-filter:blur(4px);
+    opacity:0; pointer-events:none;
+    transition:opacity 0.2s;
+  }
+  #modal-overlay.visible { opacity:1; pointer-events:all; }
+  .modal {
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:4px;
+    padding:26px 30px;
+    max-width:390px; width:90%;
+    transform:translateY(8px);
+    transition:transform 0.2s, background 0.2s;
+  }
+  #modal-overlay.visible .modal { transform:translateY(0); }
+  .modal-icon { font-size:24px; margin-bottom:11px; }
+  .modal h2 { font-family:var(--mono); font-size:12px; font-weight:600; letter-spacing:0.08em; text-transform:uppercase; margin-bottom:7px; }
+  .modal p { font-size:12px; color:var(--muted); line-height:1.6; margin-bottom:20px; }
+  .modal-actions { display:flex; flex-direction:column; gap:8px; }
+  .modal-btn { width:100%; padding:10px 16px; font-size:10px; text-align:left; display:flex; align-items:center; gap:10px; border-radius:3px; }
+  #modal-save   { border-color:var(--accent); color:var(--accent); }
+  #modal-save:hover { background:rgba(128,128,128,0.08); }
+  #modal-nosave { border-color:#ff4455; color:#ff4455; }
+  #modal-nosave:hover { background:rgba(255,68,85,0.07); }
+  #modal-cancel { border-color:var(--border); color:var(--muted); justify-content:center; }
+  #modal-cancel:hover { border-color:var(--muted); color:var(--text); }
+  .modal-sub { font-size:9px; opacity:0.5; font-weight:400; letter-spacing:0; text-transform:none; font-family:var(--sans); }
+
+  /* ── LOADING ── */
+  #loading {
+    position:fixed; inset:0;
+    background:rgba(13,13,13,0.93);
+    display:flex; flex-direction:column;
+    align-items:center; justify-content:center;
+    gap:14px; z-index:999; font-family:var(--mono);
+  }
+  #loading .spinner {
+    width:32px; height:32px;
+    border:2px solid #2a2a2a;
+    border-top-color:var(--accent);
+    border-radius:50%;
+    animation:spin 0.8s linear infinite;
+  }
+  @keyframes spin { to{transform:rotate(360deg);} }
+  #loading p { font-size:11px; color:#555; letter-spacing:0.08em; }
+  #loading.hidden { display:none; }
+</style>
+</head>
+<body>
+
+<!-- Loading -->
+<div id="loading">
+  <div class="spinner"></div>
+  <p id="loading-msg">Loading Whisper model…</p>
+</div>
+
+<!-- Clear modal -->
+<div id="modal-overlay">
+  <div class="modal">
+    <div class="modal-icon">⚠️</div>
+    <h2>Unsaved transcript</h2>
+    <p>Have you saved your transcript? This is permanent and can't be undone.</p>
+    <div class="modal-actions">
+      <button class="modal-btn" id="modal-save">
+        💾 &nbsp;Save first
+        <span class="modal-sub">— highlights export buttons so you can pick .txt or .srt</span>
+      </button>
+      <button class="modal-btn" id="modal-nosave">
+        🗑 &nbsp;Clear without saving
+        <span class="modal-sub">— permanently deletes transcript</span>
+      </button>
+      <button class="modal-btn" id="modal-cancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Header -->
+<header>
+  <button class="icon-btn" id="sidebar-toggle">☰</button>
+  <div class="logo">Tab<span>·</span>scribe</div>
+  <div class="status-badge" id="status-badge">LOADING</div>
+  <div class="header-right">
+    <div class="theme-wrap">
+      <button class="theme-trigger" id="theme-trigger">
+        <span class="dot" id="theme-dot"></span> Theme
+      </button>
+      <div class="theme-popup" id="theme-popup">
+        <div class="popup-section">
+          <div class="popup-label">Background</div>
+          <div class="bg-row">
+            <button class="bg-btn active" data-bg="black">⬛ Black</button>
+            <button class="bg-btn"        data-bg="white">⬜ White</button>
+          </div>
+        </div>
+        <div class="popup-section">
+          <div class="popup-label">Accent Color</div>
+          <div class="swatch-row">
+            <div class="swatch active" data-a="green"  title="Green"></div>
+            <div class="swatch"        data-a="red"    title="Red"></div>
+            <div class="swatch"        data-a="blue"   title="Blue"></div>
+            <div class="swatch"        data-a="purple" title="Purple"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- Warning -->
+<div class="warning-banner">
+  ⚡ &nbsp;Play at <strong>1x – 1.25x max</strong> for best accuracy &nbsp;·&nbsp; Only one audio tab at a time — multiple tabs will cause mis-transcription
+</div>
+
+<!-- Controls: [▶/⏸] [Clear]  ···  [.txt] [.srt] -->
+<div class="controls">
+  <button id="btn-playpause" disabled>▶ &nbsp;Start</button>
+  <button id="btn-clear" disabled>✕ Clear</button>
+  <div class="ctrl-spacer"></div>
+  <button class="btn-export" id="btn-txt" disabled>Export .txt</button>
+  <button class="btn-export" id="btn-srt" disabled>Export .srt</button>
+</div>
+
+<!-- Stats -->
+<div class="stats">
+  <div>SEGMENTS <span id="stat-segs">0</span></div>
+  <div>WORDS    <span id="stat-words">0</span></div>
+  <div>TIME     <span id="stat-time">00:00</span></div>
+</div>
+
+<!-- Shell -->
+<div class="shell">
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-tabs">
+      <button class="sidebar-tab active" data-tab="history">History</button>
+      <button class="sidebar-tab"        data-tab="about">About</button>
+    </div>
+    <div class="sidebar-panel active" id="panel-history">
+      <div class="history-empty" id="hist-empty">No saved transcripts yet.<br>Export a session to see it here.</div>
+    </div>
+    <div class="sidebar-panel" id="panel-about">
+      <div class="about-section">
+        <h3>What is Tabscribe?</h3>
+        <p>A local Python app that captures your PC's speaker output and transcribes it using OpenAI Whisper — offline, no API keys, no time limits.</p>
+      </div>
+      <div class="about-section">
+        <h3>How it works</h3>
+        <p>Uses <strong style="color:var(--text)">WASAPI loopback</strong> to capture system audio only. Your microphone is never touched. Audio is processed in 6-second chunks by Whisper on your CPU.</p>
+      </div>
+      <div class="about-section">
+        <h3>Best practices</h3>
+        <p>▸ Keep speed at 1x – 1.25x max<br>▸ Only one audio tab at a time<br>▸ Works on any website, DRM included<br>▸ History clears on app restart</p>
+      </div>
+      <div class="about-section">
+        <h3>Made by</h3>
+        <p style="color:var(--text); font-size:13px;">~Aries9🔥~</p>
+        <p style="margin-top:6px;">A security maniac who creates to solve their own and others problems with simple solutions.</p>
+      </div>
+    </div>
+  </div>
+
+  <div id="transcript">
+    <div class="empty-state" id="empty">
+      <span class="big">⬡</span>
+      Press Start, then play any video in your browser.<br>
+      Only speaker audio is captured — mic is never used.
+    </div>
+  </div>
+</div>
+
+<script>
+  const btnPlay  = document.getElementById('btn-playpause');
+  const btnClear = document.getElementById('btn-clear');
+  const btnTxt   = document.getElementById('btn-txt');
+  const btnSrt   = document.getElementById('btn-srt');
+  const badge    = document.getElementById('status-badge');
+  const box      = document.getElementById('transcript');
+  const empty    = document.getElementById('empty');
+  const loading  = document.getElementById('loading');
+  const loadMsg  = document.getElementById('loading-msg');
+  const overlay  = document.getElementById('modal-overlay');
+  const sidebar  = document.getElementById('sidebar');
+  const histPanel= document.getElementById('panel-history');
+  const histEmpty= document.getElementById('hist-empty');
+  const dot      = document.getElementById('theme-dot');
+
+  let isRecording = false;
+  let isPaused    = false;
+  let evtSource   = null;
+  let segCount    = 0;
+  let wordCount   = 0;
+  let elapsed     = 0;
+  let timerInt    = null;
+  let autoScroll  = true;
+
+  // track current theme state
+  let activeBg     = 'black';
+  let activeAccent = 'green';
+
+  box.addEventListener('scroll', () => {
+    autoScroll = box.scrollTop + box.clientHeight >= box.scrollHeight - 40;
+  });
+
+  // ── Sidebar toggle ────────────────────────────────────────────────────────
+  document.getElementById('sidebar-toggle').addEventListener('click', () => {
+    sidebar.classList.toggle('collapsed');
+  });
+
+  // ── Sidebar tabs ──────────────────────────────────────────────────────────
+  document.querySelectorAll('.sidebar-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.sidebar-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.sidebar-panel').forEach(p => p.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById('panel-' + tab.dataset.tab).classList.add('active');
+    });
+  });
+
+  // ── Theme popup ───────────────────────────────────────────────────────────
+  const popup = document.getElementById('theme-popup');
+  document.getElementById('theme-trigger').addEventListener('click', e => {
+    e.stopPropagation();
+    popup.classList.toggle('open');
+  });
+  document.addEventListener('click', () => popup.classList.remove('open'));
+  popup.addEventListener('click', e => e.stopPropagation());
+
+  // Background buttons (Black / White)
+  document.querySelectorAll('.bg-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.bg-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      activeBg = btn.dataset.bg;
+      applyTheme();
+    });
+  });
+
+  // Accent swatches (Green / Red / Blue / Purple)
+  document.querySelectorAll('.swatch').forEach(sw => {
+    sw.addEventListener('click', () => {
+      document.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
+      sw.classList.add('active');
+      activeAccent = sw.dataset.a;
+      applyTheme();
+    });
+  });
+
+  const accentColors = { green:'#00ff88', red:'#ff4455', blue:'#00aaff', purple:'#bb55ff' };
+
+  function applyTheme() {
+    document.documentElement.setAttribute('data-bg',     activeBg);
+    document.documentElement.setAttribute('data-accent', activeAccent);
+    dot.style.background = accentColors[activeAccent];
+  }
+
+  // ── Poll model ready ──────────────────────────────────────────────────────
+  async function pollStatus() {
+    try {
+      const r = await fetch('/status');
+      const d = await r.json();
+      loadMsg.textContent = d.message;
+      if (d.ready) {
+        loading.classList.add('hidden');
+        btnPlay.disabled = false;
+        setBadge('READY', 'ready');
+      } else { setTimeout(pollStatus, 1200); }
+    } catch { setTimeout(pollStatus, 2000); }
+  }
+  pollStatus();
+
+  // ── Play/Pause — 3 state machine ──────────────────────────────────────────
+  btnPlay.addEventListener('click', async () => {
+
+    // IDLE → start
+    if (!isRecording) {
+      const r = await fetch('/start', { method:'POST' });
+      const d = await r.json();
+      if (d.error) { alert(d.error); return; }
+
+      isRecording = true;
+      isPaused    = false;
+      setPlayBtn('pause');
+      btnClear.disabled = true;
+      btnTxt.disabled = btnSrt.disabled = true;
+      btnTxt.classList.remove('highlight');
+      btnSrt.classList.remove('highlight');
+      setBadge('● REC', 'running');
+      elapsed = 0;
+      timerInt = setInterval(tick, 1000);
+      evtSource = new EventSource('/stream');
+      evtSource.onmessage = e => {
+        const d2 = JSON.parse(e.data);
+        if (d2.ping || d2.error) return;
+        addSegment(d2);
+      };
+      return;
+    }
+
+    // RECORDING → pause
+    if (!isPaused) {
+      isPaused = true;
+      await fetch('/pause', { method:'POST',
+        body: JSON.stringify({ paused:true }),
+        headers: {'Content-Type':'application/json'} });
+      setPlayBtn('resume');
+      setBadge('PAUSED', 'paused');
+      clearInterval(timerInt);
+
+      // enable exports + clear when paused so user can save mid-session
+      btnTxt.disabled = btnSrt.disabled = btnClear.disabled = segCount === 0;
+      return;
+    }
+
+    // PAUSED → resume
+    isPaused = false;
+    await fetch('/pause', { method:'POST',
+      body: JSON.stringify({ paused:false }),
+      headers: {'Content-Type':'application/json'} });
+    setPlayBtn('pause');
+    setBadge('● REC', 'running');
+    btnClear.disabled = true;
+    btnTxt.disabled = btnSrt.disabled = true;
+    timerInt = setInterval(tick, 1000);
+  });
+
+  // ── Clear ─────────────────────────────────────────────────────────────────
+  btnClear.addEventListener('click', () => overlay.classList.add('visible'));
+
+  document.getElementById('modal-save').addEventListener('click', () => {
+    overlay.classList.remove('visible');
+    btnTxt.classList.add('highlight');
+    btnSrt.classList.add('highlight');
+    setTimeout(() => {
+      btnTxt.classList.remove('highlight');
+      btnSrt.classList.remove('highlight');
+    }, 3200);
+  });
+
+  document.getElementById('modal-nosave').addEventListener('click', () => {
+    overlay.classList.remove('visible');
+    doClear();
+  });
+
+  document.getElementById('modal-cancel').addEventListener('click', () => {
+    overlay.classList.remove('visible');
+  });
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.classList.remove('visible'); });
+
+  function doClear() {
+    // stop if still running
+    if (isRecording) {
+      fetch('/stop', { method:'POST' });
+      if (evtSource) { evtSource.close(); evtSource = null; }
+      clearInterval(timerInt);
+    }
+    Array.from(box.children).forEach(c => { if (c !== empty) c.remove(); });
+    empty.style.display = '';
+    segCount = wordCount = elapsed = 0;
+    document.getElementById('stat-segs').textContent  = '0';
+    document.getElementById('stat-words').textContent = '0';
+    document.getElementById('stat-time').textContent  = '00:00';
+    btnClear.disabled = btnTxt.disabled = btnSrt.disabled = true;
+    btnTxt.classList.remove('highlight');
+    btnSrt.classList.remove('highlight');
+    setPlayBtn('start');
+    setBadge('READY', 'ready');
+    isRecording = false;
+    isPaused    = false;
+  }
+
+  // ── Exports ───────────────────────────────────────────────────────────────
+  btnTxt.addEventListener('click', () => {
+    btnTxt.classList.remove('highlight');
+    btnSrt.classList.remove('highlight');
+    window.location = '/export/txt';
+    setTimeout(loadHistory, 1200);
+  });
+  btnSrt.addEventListener('click', () => {
+    btnTxt.classList.remove('highlight');
+    btnSrt.classList.remove('highlight');
+    window.location = '/export/srt';
+    setTimeout(loadHistory, 1200);
+  });
+
+  // ── History ───────────────────────────────────────────────────────────────
+  async function loadHistory() {
+    try {
+      const r = await fetch('/history');
+      const entries = await r.json();
+      Array.from(histPanel.children).forEach(c => { if (c !== histEmpty) c.remove(); });
+      if (!entries.length) { histEmpty.style.display = ''; return; }
+      histEmpty.style.display = 'none';
+      entries.forEach(e => {
+        const div = document.createElement('div');
+        div.className = 'hist-entry';
+        div.innerHTML = `
+          <div class="hist-top">
+            <span class="hist-badge ${e.fmt.toLowerCase()}">${e.fmt}</span>
+            <span class="hist-name">${e.filename}</span>
+          </div>
+          <div class="hist-meta">${e.segments} segs &nbsp;<span>${e.words} words</span></div>
+          <div class="hist-time">${e.saved_at}</div>`;
+        histPanel.appendChild(div);
+      });
+    } catch {}
+  }
+  loadHistory();
+  setInterval(loadHistory, 5000);
+
+  // ── Add segment ───────────────────────────────────────────────────────────
+  function addSegment(seg) {
+    if (segCount === 0) empty.style.display = 'none';
+    segCount++;
+    wordCount += seg.text.split(/\s+/).filter(Boolean).length;
+    document.getElementById('stat-segs').textContent  = segCount;
+    document.getElementById('stat-words').textContent = wordCount;
+    const div = document.createElement('div');
+    div.className = 'seg new';
+    div.innerHTML = `<div class="seg-time">${fmtTime(seg.start)}</div>
+                     <div class="seg-text">${esc(seg.text)}</div>`;
+    box.appendChild(div);
+    setTimeout(() => div.classList.remove('new'), 1500);
+    if (autoScroll) box.scrollTop = box.scrollHeight;
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  function setPlayBtn(state) {
+    const styles = {
+      start:  { html:'▶ &nbsp;Start',  bc:'var(--accent)', c:'var(--accent)' },
+      pause:  { html:'⏸ &nbsp;Pause',  bc:'var(--warn)',   c:'var(--warn)'   },
+      resume: { html:'▶ &nbsp;Resume', bc:'var(--accent)', c:'var(--accent)' },
+    };
+    const s = styles[state];
+    btnPlay.innerHTML          = s.html;
+    btnPlay.style.borderColor  = s.bc;
+    btnPlay.style.color        = s.c;
+  }
+
+  function setBadge(text, cls) {
+    badge.textContent = text;
+    badge.className   = 'status-badge ' + cls;
+  }
+
+  function tick() {
+    elapsed++;
+    document.getElementById('stat-time').textContent = pad(Math.floor(elapsed/60)) + ':' + pad(elapsed%60);
+  }
+
+  function fmtTime(s) {
+    const h=Math.floor(s/3600), m=Math.floor((s%3600)/60), sc=Math.floor(s%60);
+    return h>0 ? `${h}:${pad(m)}:${pad(sc)}` : `${pad(m)}:${pad(sc)}`;
+  }
+  const pad = n => String(n).padStart(2,'0');
+  const esc = t => t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+</script>
+</body>
+</html>

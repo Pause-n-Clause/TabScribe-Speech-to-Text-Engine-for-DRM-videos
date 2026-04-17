@@ -1,0 +1,4 @@
+flask>=3.0
+faster-whisper>=1.0
+pyaudiowpatch>=0.2.12
+numpy>=1.24
